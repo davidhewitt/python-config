@@ -9,7 +9,7 @@ pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 
 /// Extract compilation vars from the specified interpreter.
-fn get_config_from_interpreter(interpreter: &Path) -> Result<InterpreterConfig> {
+pub fn get_config_from_interpreter<P: AsRef<Path>>(interpreter: P) -> Result<InterpreterConfig> {
     let script = r#"
 import json
 import platform
@@ -37,7 +37,7 @@ print("shared", PYPY or bool(sysconfig.get_config_var('Py_ENABLE_SHARED')))
 print("executable", sys.executable)
 print("calcsize_pointer", struct.calcsize("P"))
 "#;
-    let output = run_python_script(interpreter, script)?;
+    let output = run_python_script(interpreter.as_ref(), script)?;
     let map: HashMap<String, String> = output
         .lines()
         .filter_map(|line| {
@@ -60,7 +60,7 @@ print("calcsize_pointer", struct.calcsize("P"))
     })
 }
 
-/// Information returned from python interpreter
+/// Information about a Python interpreter
 #[derive(Debug)]
 pub struct InterpreterConfig {
     pub version: PythonVersion,
@@ -148,4 +148,12 @@ pub fn find_interpreters() -> impl Iterator<Item = InterpreterConfig> {
         .filter_map(|interpreter| {
             get_config_from_interpreter(Path::new(interpreter)).ok()
         })
+}
+
+/// Return the first interpreter matching the given criterion.
+pub fn find_interpreter_matching<F>(f: F) -> Option<InterpreterConfig>
+where
+    F: FnMut(&InterpreterConfig) -> bool
+{
+    find_interpreters().find(f)
 }
