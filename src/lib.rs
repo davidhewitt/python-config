@@ -11,6 +11,8 @@ pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 /// Extract compilation vars from the specified interpreter.
 pub fn get_config_from_interpreter<P: AsRef<Path>>(interpreter: P) -> Result<InterpreterConfig> {
     let script = r#"
+from __future__ import print_function
+
 import json
 import platform
 import struct
@@ -45,18 +47,30 @@ print("calcsize_pointer", struct.calcsize("P"))
             Some((i.next()?.into(), i.next()?.into()))
         })
         .collect();
+
+    macro_rules! get {
+        ($key:literal) => {
+            map.get($key)
+                .ok_or_else(|| format!(
+                    "Failed to get {} from the python interpreter. Output was:\n\n{}",
+                    $key,
+                    output
+                ))
+        }
+    }
+
     Ok(InterpreterConfig {
         version: PythonVersion {
-            major: map["version_major"].parse()?,
-            minor: map["version_minor"].parse()?,
-            implementation: map["implementation"].parse()?,
+            major: get!("version_major")?.parse()?,
+            minor: get!("version_minor")?.parse()?,
+            implementation: get!("implementation")?.parse()?,
         },
         libdir: map.get("libdir").cloned(),
-        shared: map["shared"] == "True",
-        ld_version: map["ld_version"].clone(),
-        base_prefix: map["base_prefix"].clone(),
-        executable: map["executable"].clone().into(),
-        calcsize_pointer: map["calcsize_pointer"].parse()?,
+        shared: get!("shared")? == "True",
+        ld_version: get!("ld_version")?.clone(),
+        base_prefix: get!("base_prefix")?.clone(),
+        executable: get!("executable")?.clone().into(),
+        calcsize_pointer: get!("calcsize_pointer")?.parse()?,
     })
 }
 
